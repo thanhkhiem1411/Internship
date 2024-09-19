@@ -1,0 +1,68 @@
+GO
+
+CREATE VIEW [dbo].[SOFTEKVIEW]
+AS
+SELECT        BuyingRateWithHBL.InputData AS RCIndex, InvoiceReference.DateInvoice, InvoiceReference.InvID AS InvID, CAST(2 AS int) AS [D/C], Left(ContactsList.DeptID,2) AS BranchCode, InvoiceReference.InvID AS InvNo, InvoiceReference.IssuedDate AS InvDate, BuyingRateWithHBL.Quantity, BuyingRateWithHBL.Unit, BuyingRateWithHBL.UnitPrice, BuyingRateWithHBL.CurrencyConvertRate AS Curr, 
+                         BuyingRateWithHBL.Quantity * BuyingRateWithHBL.UnitPrice AS BeforeTax, CASE WHEN ISNULL(BuyingRateWithHBL.VAT, 0) < 0 THEN NULL 
+                         ELSE BuyingRateWithHBL.VAT END AS VAT, CASE WHEN ISNULL(BuyingRateWithHBL.VAT, 0) < 0 THEN ABS(BuyingRateWithHBL.VAT) 
+                         ELSE BuyingRateWithHBL.Quantity * BuyingRateWithHBL.UnitPrice * ISNULL(BuyingRateWithHBL.VAT, 0) / 100 END AS VATAmount, BuyingRateWithHBL.TotalValue AS AfterTax, 
+                         InvoiceReference.TransID AS JobNo, BuyingRateWithHBL.HAWBNO AS HBLNO, Transactions.MAWB AS [MBLNO], 
+						 ISNULL((SELECT TOP 1 CustomsDeclaration.TKSo FROM TransactionDetails INNER JOIN CustomsDeclaration ON TransactionDetails.CustomsID = CustomsDeclaration.MasoTK WHERE TransactionDetails.TransID=[Transactions].[TransID]),'') AS CDSNo, 
+						 CASE WHEN ISNULL(BuyingRateWithHBL.RequisitionID,'')<>'' THEN AdvanceRequest.RequesterID ELSE InvoiceReference.ShipperID END AS PartnerID, CASE WHEN ISNULL(BuyingRateWithHBL.RequisitionID,'')<>'' THEN AdvanceRequest.RequesterName ELSE InvoiceReference.ShipperName END AS [PartnerName], 
+                         BuyingRateWithHBL.SortDes AS FeeCode, BuyingRateWithHBL.Description AS [Description], Departments.DeptID, Departments.Department,
+						  BuyingRateWithHBL.Notes, CASE WHEN ISNULL(BuyingRateWithHBL.RequisitionID,'')<>'' THEN InvoiceReference.ShipperID ELSE '' END AS RPartnerID, CASE WHEN ISNULL(BuyingRateWithHBL.RequisitionID,'')<>'' THEN InvoiceReference.ShipperName ELSE '' END AS [RPartnerName], CASE WHEN CHARINDEX('(', ISNULL(BuyingRateWithHBL.Docs,''))>0 THEN '' ELSE ISNULL(BuyingRateWithHBL.Docs,'') END AS VATNo, Transactions.OMB AS PONo
+FROM            ContactsList INNER JOIN
+                         InvoiceReference INNER JOIN
+                         Transactions ON InvoiceReference.TransID = Transactions.TransID INNER JOIN
+                         BuyingRateWithHBL ON InvoiceReference.InvID = BuyingRateWithHBL.InoiceNo ON ContactsList.Username = InvoiceReference.WhoisIssued INNER JOIN
+                         Departments ON ContactsList.DeptID = Departments.DeptID LEFT OUTER JOIN
+                         AdvanceRequest ON BuyingRateWithHBL.RequisitionID = AdvanceRequest.RefNo
+
+UNION 
+SELECT        SellingRate.InputData AS RCIndex, InvoiceReference.DateInvoice, InvoiceReference.InvID AS InvID, CAST(1 AS int) AS [D/C], Left(ContactsList.DeptID,2) AS BranchCode, InvoiceReference.InvID AS InvNo, InvoiceReference.IssuedDate AS InvDate, SellingRate.Quantity, SellingRate.QUnit AS Unit, SellingRate.UnitPrice, SellingRate.Unit AS Curr, 
+                         SellingRate.Quantity * SellingRate.UnitPrice AS BeforeTax, CASE WHEN ISNULL(SellingRate.VAT, 0) < 0 THEN NULL 
+                         ELSE SellingRate.VAT END AS VAT, CASE WHEN ISNULL(SellingRate.VAT, 0) < 0 THEN ABS(SellingRate.VAT) 
+                         ELSE SellingRate.Quantity * SellingRate.UnitPrice * ISNULL(SellingRate.VAT, 0) / 100 END AS VATAmount, SellingRate.TotalValue AS AfterTax, 
+                         InvoiceReference.TransID AS JobNo, SellingRate.HAWBNO AS HBLNO, Transactions.MAWB AS [MBLNO], 
+						 ISNULL((SELECT TOP 1 CustomsDeclaration.TKSo FROM TransactionDetails INNER JOIN CustomsDeclaration ON TransactionDetails.CustomsID = CustomsDeclaration.MasoTK WHERE TransactionDetails.TransID=[Transactions].[TransID]),'') AS CDSNo,
+						 InvoiceReference.ShipperID AS PartnerID, InvoiceReference.ShipperName AS [PartnerName], 
+                         SellingRate.SortDes AS FeeCode, SellingRate.Description, Departments.DeptID, Departments.Department,
+						  SellingRate.Notes, '' AS RPartnerID, '' AS [RPartnerName], CASE WHEN CHARINDEX('(', ISNULL(SellingRate.DocNo,''))>0 THEN '' ELSE ISNULL(SellingRate.DocNo,'') END AS VATNo, Transactions.OMB AS PONo
+FROM            SellingRate INNER JOIN
+                         ContactsList INNER JOIN
+                         InvoiceReference INNER JOIN
+                         Transactions ON InvoiceReference.TransID = Transactions.TransID ON ContactsList.Username = InvoiceReference.WhoisIssued INNER JOIN
+                         Departments ON ContactsList.DeptID = Departments.DeptID ON SellingRate.InoiceNo = InvoiceReference.InvID
+
+UNION
+SELECT        ProfitShares.DataInput AS RCIndex, InvoiceReference.DateInvoice, InvoiceReference.InvID AS InvID, CASE WHEN ISNULL(ProfitShares.Dpt,0)<>0 THEN 1 ELSE 2 END AS [D/C], Left(ContactsList.DeptID,2) AS BranchCode, InvoiceReference.InvID AS InvNo, InvoiceReference.IssuedDate AS InvDate, ProfitShares.Quantity, ProfitShares.QUnit AS Unit, ProfitShares.UnitPrice, ProfitShares.CurrencyConvertRate AS Curr, 
+                         ProfitShares.Quantity * ProfitShares.UnitPrice AS BeforeTax, CASE WHEN ISNULL(ProfitShares.VAT, 0) < 0 THEN NULL 
+                         ELSE ProfitShares.VAT END AS VAT, CASE WHEN ISNULL(ProfitShares.VAT, 0) < 0 THEN ABS(ProfitShares.VAT) 
+                         ELSE ProfitShares.Quantity * ProfitShares.UnitPrice * ISNULL(ProfitShares.VAT, 0) / 100 END AS VATAmount, ProfitShares.TotalValue AS AfterTax, 
+                         InvoiceReference.TransID AS JobNo, ProfitShares.HAWBNO AS HBLNO, Transactions.MAWB AS [MBLNO], ISNULL((SELECT TOP 1 CustomsDeclaration.TKSo FROM TransactionDetails INNER JOIN CustomsDeclaration ON TransactionDetails.CustomsID = CustomsDeclaration.MasoTK WHERE TransactionDetails.TransID=[Transactions].[TransID]),'') AS CDSNo, 
+						 CASE WHEN ISNULL(ProfitShares.RequisitionID,'')<>'' THEN AdvanceRequest.RequesterID ELSE InvoiceReference.ShipperID END AS PartnerID, CASE WHEN ISNULL(ProfitShares.RequisitionID,'')<>'' THEN AdvanceRequest.RequesterName ELSE InvoiceReference.ShipperName END AS [PartnerName], 
+                         ProfitShares.SortDes AS FeeCode, ProfitShares.Notes AS Description, Departments.DeptID, Departments.Department,
+						  '' AS Notes, CASE WHEN ISNULL(ProfitShares.RequisitionID,'')<>'' THEN InvoiceReference.ShipperID ELSE '' END AS RPartnerID, CASE WHEN ISNULL(ProfitShares.RequisitionID,'')<>'' THEN InvoiceReference.ShipperName ELSE '' END AS [RPartnerName], CASE WHEN CHARINDEX('(', ISNULL(ProfitShares.Docs,''))>0 THEN '' ELSE ISNULL(ProfitShares.Docs,'') END AS VATNo, Transactions.OMB AS PONo
+FROM            ContactsList INNER JOIN
+                         InvoiceReference INNER JOIN
+                         Transactions ON InvoiceReference.TransID = Transactions.TransID INNER JOIN
+                         ProfitShares ON InvoiceReference.InvID = ProfitShares.InoiceNo ON ContactsList.Username = InvoiceReference.WhoisIssued INNER JOIN
+                         Departments ON ContactsList.DeptID = Departments.DeptID LEFT OUTER JOIN
+                         AdvanceRequest ON ProfitShares.RequisitionID = AdvanceRequest.RefNo
+
+UNION
+SELECT        HandleServiceRate.DataIndex AS RCIndex, InvoiceReference.DateInvoice, InvoiceReference.InvID AS InvID, CASE WHEN ISNULL(HandleServiceRate.Dpt,0)<>0 THEN 1 ELSE 2 END AS [D/C], Left(ContactsList.DeptID,2) AS BranchCode, InvoiceReference.InvID AS InvNo, InvoiceReference.IssuedDate AS InvDate, 
+						HandleServiceRate.Quantity, HandleServiceRate.Unit, HandleServiceRate.UnitPrice, HandleServiceRate.Curr, 
+                         HandleServiceRate.Quantity * HandleServiceRate.UnitPrice AS BeforeTax, CASE WHEN ISNULL(HandleServiceRate.VAT, 0) < 0 THEN NULL 
+                         ELSE HandleServiceRate.VAT END AS VAT, CASE WHEN ISNULL(HandleServiceRate.VAT, 0) < 0 THEN ABS(HandleServiceRate.VAT) 
+                         ELSE HandleServiceRate.Quantity * HandleServiceRate.UnitPrice * ISNULL(HandleServiceRate.VAT, 0) / 100 END AS VATAmount, HandleServiceRate.TotalValue AS AfterTax, 
+                         InvoiceReference.TransID AS JobNo, InvoiceReference.ShipperAddress AS HBLNO, Transactions.MAWB AS [MBLNO],
+						 ISNULL((SELECT TOP 1 CustomsDeclaration.TKSo FROM TransactionDetails INNER JOIN CustomsDeclaration ON TransactionDetails.CustomsID = CustomsDeclaration.MasoTK WHERE TransactionDetails.TransID=[Transactions].[TransID]),'') AS CDSNo, 
+						 InvoiceReference.ShipperID AS PartnerID, InvoiceReference.ShipperName AS [PartnerName], HandleServiceRate.SortDes AS FeeCode, HandleServiceRate.Description, Departments.DeptID, Departments.Department, 
+						 HandleServiceRate.Notes, '' AS RPartnerID, '' AS [RPartnerName], CASE WHEN CHARINDEX('(', ISNULL(HandleServiceRate.DocsNo,''))>0 THEN '' ELSE ISNULL(HandleServiceRate.DocsNo,'') END AS VATNo, Transactions.OMB AS PONo
+FROM            HandleServiceRate INNER JOIN
+                         InvoiceReference ON HandleServiceRate.InoiceNo = InvoiceReference.InvID INNER JOIN
+                         Transactions ON InvoiceReference.TransID = Transactions.TransID INNER JOIN
+                         Departments INNER JOIN
+                         ContactsList ON Departments.DeptID = ContactsList.DeptID ON InvoiceReference.WhoisIssued = ContactsList.Username
+GO
