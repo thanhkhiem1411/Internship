@@ -1,0 +1,121 @@
+def etl_func_delete_old_data(df, tbl_name, engine):
+    if not df.empty and '_id' in df.columns:
+        # Assuming df and engine are already defined
+        chunk_size = 5000
+
+        # Get the list of _id values from DataFrame
+        id_values = df['_id'].tolist()
+        total_len_df = len(id_values)
+        total_delete = 0
+
+        # Split the list into chunks of 1000
+        id_chunks = [id_values[i:i+chunk_size] for i in range(0, len(id_values), chunk_size)]
+
+        # Iterate over chunks and delete data
+        for chunk in id_chunks:
+            id_list = ','.join([f"'{value}'" for value in chunk])
+            delete_query = f"DELETE FROM {tbl_name} WHERE _id IN ({id_list})"
+            try:
+                with engine.connect() as conn:
+                    with conn.begin() as trans:
+                        count_delete = len(chunk)
+                        result = conn.execute(text(delete_query))
+                        trans.commit()
+                        total_delete += count_delete  # Increment total inserted count
+                        print(f"Delete {count_delete} _id . Total Deleted: {total_delete}/{total_len_df}")
+            except Exception as e:
+                print(f"Error deleting old data from {tbl_name}: {e}")
+                raise  
+
+    else:
+        print("Dataframe is empty or does not contain '_id' column.")
+    engine.dispose()
+
+def define_insert_df(df, input_table, engine):
+    # inspector = inspect(engine)
+    # columns_info = inspector.get_columns(input_table)
+    # metadata = MetaData()
+    # table_columns = []
+    # # Define columns for the table
+    # for column in columns_info:
+    #     column_name = column['name']
+    #     column_type = column['type']
+    #     table_columns.append(Column(column_name, column_type))
+    # table = Table(input_table, metadata, *table_columns)
+    
+    destination_metadata = MetaData()
+    destination_metadata.bind = engine
+    inspector = inspect(engine)
+    source_columns = inspector.get_columns(input_table)
+    table = Table(input_table, destination_metadata, *[Column(column['name'], column['type']) for column in source_columns])
+    destination_metadata.create_all(engine)
+    # df = df.where(pd.notnull(df), None)
+    total_rows = len(df)
+    total_inserted = 0
+    start_time = datetime.now()
+    start_time_1000 = datetime.now()  # Moved this line outside the if block
+
+    
+    with engine.connect() as conn:
+        # Iterate through DataFrame rows and insert into the table
+        for index, row in df.iterrows():
+            row_dict = row.to_dict()
+            # Handle special cases such as NaN, arrays, and ObjectId
+            for key, value in row_dict.items():
+                if isinstance(value, list):
+                    # Convert lists to strings
+                    row_dict[key] = ', '.join(map(str, value))
+                elif isinstance(value, np.ndarray):
+                    for i, element in enumerate(value):
+                        if pd.isna(element):  # Check if each element is NaN
+                            row_dict[key][i] = None
+                elif isinstance(value, float) and np.isnan(value):
+                    row_dict[key] = None
+                elif isinstance(value, ObjectId):
+                    row_dict[key] = str(value)
+                elif isinstance(value, dict):  # Convert nested dictionaries to strings
+                    row_dict[key] = str(value)
+                elif isinstance(value, Decimal128):  # Handle Decimal128 values
+                    row_dict[key] = str(value)  # Convert Decimal128 to float or appropriate numeric type
+                elif pd.isna(value):  # Handle NaT values
+                    row_dict[key] = None
+
+            try:
+                insert_statement = table.insert().values(**row_dict)
+                # conn.execute(insert_statement)
+                with conn.begin() as trans:
+                    conn.execute(insert_statement)
+                    trans.commit()
+                    
+                    total_inserted += 1  # Increment total inserted count
+                    if total_inserted % 1000 == 0:
+                        end_time_1000 = datetime.now()
+                        total_seconds = (end_time_1000 - start_time_1000).total_seconds()
+                        print(f"Total inserted: {total_inserted}/{total_rows}")
+                        print(f"Average time to insert last 1000 rows: {total_seconds:.2f} seconds --- datetime.now(): {end_time_1000}")
+                        start_time_1000 = datetime.now()  # Moved this line outside the if block
+
+
+            except Exception as e:
+                print("Error inserting row:", row_dict)
+                print("Error message:", str(e))
+                raise  
+
+
+    end_time = datetime.now()
+    time_difference = end_time - start_time  # Calculate the time difference
+    # Convert the total time difference to hours and minutes
+    total_seconds = time_difference.total_seconds()
+
+    print(f"start_time: {start_time} --- end_time: {end_time}, ")
+    print(f"total : {total_seconds} seconds   --- or  {(total_seconds/60):.2f} minites ")
+    
+    average_time_insert_1000_rows = (total_seconds / total_rows * 1000) if total_rows != 0 else 0
+
+    print(f"All average time to insert 1000 rows: {average_time_insert_1000_rows:.2f} seconds")
+    engine.dispose()
+
+
+
+
+

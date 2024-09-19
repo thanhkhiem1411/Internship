@@ -1,0 +1,1776 @@
+SELECT DISTINCT
+    CASE
+        WHEN ISNULL(TransactionDetails.ShipmentType, '') = 'NOMINATED' THEN
+            ''
+        WHEN ISNULL(TransactionDetails.ContactID, '') = '' THEN
+            Departments.Department
+        ELSE
+            Departments_2.Department
+    END AS Department,
+    CASE
+        WHEN ISNULL(TransactionDetails.ShipmentType, '') = 'NOMINATED' THEN
+            ''
+        WHEN ISNULL(TransactionDetails.ContactID, '') = '' THEN
+            ContactsList.ContactName
+        ELSE
+            ContactsList_3.ContactName
+    END AS ContactName,
+    CASE
+        WHEN ISNULL(TransactionDetails.ShipmentType, '') = 'NOMINATED' THEN
+            ''
+        WHEN ISNULL(TransactionDetails.ContactID, '') = '' THEN
+            ContactsList_1.ContactName
+        ELSE
+            ContactsList_4.ContactName
+    END AS SalesManager,
+    Partners.PartnerName,
+    CASE
+        WHEN ISNULL(TransactionDetails.MAWBSE, '') <> '' THEN
+        (
+            SELECT TOP 1
+                TransSV.Description
+            FROM TransactionType AS TransSV
+                RIGHT OUTER JOIN Transactions AS TransMT
+                    ON TransSV.IDTransType = TransMT.TpyeofService
+                LEFT OUTER JOIN TransactionDetails AS TransDT
+                    ON TransMT.TransID = TransDT.TransID
+            WHERE TransDT.HWBNO = [TransactionDetails].[MAWBSE]
+        )
+        WHEN ISNULL(TransactionDetails.MAWB, '') <> '' THEN
+        (
+            SELECT TOP 1
+                TransSV.Description
+            FROM TransactionType AS TransSV
+                RIGHT OUTER JOIN Transactions AS TransMT
+                    ON TransSV.IDTransType = TransMT.TpyeofService
+                LEFT OUTER JOIN TransactionDetails AS TransDT
+                    ON TransMT.TransID = TransDT.TransID
+            WHERE TransDT.HWBNO = [TransactionDetails].[MAWB]
+        )
+        ELSE
+            TransactionType.Description
+    END AS [Description],
+    CASE
+        WHEN ISNULL(   CASE
+                           WHEN [TransactionType].[Export] <> 0 THEN
+                               [Airports_2].[Zone]
+                           ELSE
+                               [Airports_1].[Zone]
+                       END,
+                       ''
+                   ) = '' THEN
+            CASE
+                WHEN [TransactionType].[Export] <> 0 THEN
+                    ISNULL(Transactions.PortofUnlading, '')
+                ELSE
+                    ISNULL(Transactions.PortofLading, '')
+            END
+        WHEN [TransactionType].[Export] <> 0 THEN
+            [Airports_2].[Zone]
+        ELSE
+            [Airports_1].[Zone]
+    END AS Area,
+    CASE
+        WHEN ISNULL(Airports_1.AirPortID, '') = '' THEN
+            ISNULL(Transactions.PortofLading, '')
+        ELSE
+            Airports_1.AirPortID
+    END AS POL,
+    CASE
+        WHEN Transactions.TpyeofService = 'ExpressTransactions' THEN
+            Transactions.Destination
+        ELSE
+            CASE
+                WHEN ISNULL(Airports_2.AirPortID, '') = '' THEN
+                    ISNULL(Transactions.PortofUnlading, '')
+                ELSE
+                    Airports_2.AirPortID
+            END
+    END AS POD,
+    CASE
+        WHEN Transactions.TpyeofService = 'InlandTrucking'
+             AND ISNULL(TransactionDetails.SCIACI, '') <> '' THEN
+            ISNULL(
+            (
+                SELECT PartnerName
+                FROM Partners AS Carrier
+                WHERE Carrier.PartnerID = TransactionDetails.SCIACI
+            ),
+            ''
+                  )
+        ELSE
+            ISNULL(Partners_1.PartnerName, '')
+    END AS Lines,
+    ISNULL(Partners_2.PartnerName, '') AS Agent,
+    ISNULL(TransactionDetails.NominationParty, '') AS NominationParty,
+    Transactions.assigned,
+    CASE
+        WHEN Transactions.TpyeofService = 'CustomsLogistics'
+             AND ISNULL(TransactionDetails.MAWB, '') <> '' THEN
+            ISNULL(
+            (
+                SELECT TOP 1
+                    TransDT.TransID
+                FROM TransactionDetails AS TransDT
+                WHERE TransDT.HWBNO = [TransactionDetails].[MAWB]
+            ),
+            Transactions.TransID
+                  )
+        WHEN Transactions.TpyeofService = 'InlandTrucking'
+             AND ISNULL(TransactionDetails.MAWBSE, '') <> '' THEN
+            ISNULL(
+            (
+                SELECT TOP 1
+                    TransDT.TransID
+                FROM TransactionDetails AS TransDT
+                WHERE TransDT.HWBNO = [TransactionDetails].[MAWBSE]
+            ),
+            Transactions.TransID
+                  )
+        WHEN Transactions.TpyeofService = 'InlandTrucking'
+             AND ISNULL(TransactionDetails.MAWB, '') <> '' THEN
+            ISNULL(
+            (
+                SELECT TOP 1
+                    TransDT.TransID
+                FROM TransactionDetails AS TransDT
+                WHERE TransDT.HWBNO = [TransactionDetails].[MAWB]
+            ),
+            Transactions.TransID
+                  )
+        ELSE
+            Transactions.TransID
+    END AS TransID,
+    CASE
+        WHEN IsDate([Transactions].[LoadingDate]) <> 0 THEN
+            [Transactions].[LoadingDate]
+        ELSE
+            [Transactions].[TransDate]
+    END AS LoadingDate,
+    CASE
+        WHEN ISNULL(TransactionDetails.MAWBSE, '') <> '' THEN
+            TransactionDetails.MAWBSE
+        WHEN ISNULL(TransactionDetails.MAWB, '') <> '' THEN
+            TransactionDetails.MAWB
+        ELSE
+            TransactionDetails.HWBNO
+    END AS HWBNO,
+    CASE
+        WHEN [Transactions].[TpyeofService] = 'ExpressTransactions' THEN
+            CAST(ISNULL([HAWB].[ChargeableWeight], 0) AS NVARCHAR(20)) + ' KGS'
+        WHEN CHARINDEX('FCL', [Transactions].[TpyeofService]) > 0 THEN
+            [TransactionDetails].[ContainerSize]
+        WHEN [Transactions].[TpyeofService] = 'CustomsLogistics' THEN
+            CAST(ISNULL([Transactions].[Noofpieces], 0) AS NVARCHAR(20))
+            + CASE
+                  WHEN CHARINDEX('´', [Transactions].[UnitPieaces]) > 0 THEN
+                      'X'
+                  ELSE
+                      ' '
+              END + ISNULL([Transactions].[UnitPieaces], '')
+        WHEN ISNULL([TransactionDetails].[Quantity], 0) = 0 THEN
+            ISNULL([HAWBDETAILS].[NoPieces], '')
+        ELSE
+            LTRIM(STR(ISNULL([TransactionDetails].[Quantity], 0)))
+            + UPPER(   CASE
+                           WHEN ISNULL([TransactionDetails].[UnitDetail], '') <> '' THEN
+                               ' ' + [TransactionDetails].[UnitDetail]
+                           ELSE
+                               ''
+                       END
+                   )
+    END AS Volumne,
+    CASE
+        WHEN [Transactions].[TpyeofService] = 'CustomsLogistics'
+             AND (
+                     CHARINDEX('20´', [Transactions].[UnitPieaces]) > 0
+                     OR CHARINDEX('22´', [Transactions].[UnitPieaces]) > 0
+                 ) THEN
+            ISNULL([Transactions].[Noofpieces], 0)
+        ELSE
+            ISNULL(
+            (
+                SELECT Sum(ContainerLoaded.Qty) AS SumOfQty
+                FROM ContainerLoaded
+                WHERE ContainerLoaded.TransID = [Transactions].[TransID]
+                      AND (
+                              CHARINDEX('20', ContainerLoaded.Container) > 0
+                              OR CHARINDEX('22', ContainerLoaded.Container) > 0
+                          )
+            ),
+            0
+                  )
+    END AS Qty20,
+    CASE
+        WHEN [Transactions].[TpyeofService] = 'CustomsLogistics'
+             AND CHARINDEX('40´', [Transactions].[UnitPieaces]) > 0
+             And CHARINDEX('40´HC', [Transactions].[UnitPieaces]) = 0
+             And CHARINDEX('40´HQ', [Transactions].[UnitPieaces]) = 0
+             And CHARINDEX('RH', [Transactions].[UnitPieaces]) = 0
+             And CHARINDEX('45´', [Transactions].[UnitPieaces]) = 0 THEN
+            ISNULL([Transactions].[Noofpieces], 0)
+        ELSE
+            ISNULL(
+            (
+                SELECT Sum(ContainerLoaded.Qty) AS SumOfQty
+                FROM ContainerLoaded
+                WHERE ContainerLoaded.TransID = [Transactions].[TransID]
+                      AND CHARINDEX('20', ContainerLoaded.Container) = 0
+                      AND CHARINDEX('HC', ContainerLoaded.Container) = 0
+                      AND CHARINDEX('HQ', ContainerLoaded.Container) = 0
+                      AND CHARINDEX('RH', ContainerLoaded.Container) = 0
+                      AND CHARINDEX('45', ContainerLoaded.Container) = 0
+                      AND CHARINDEX('40', ContainerLoaded.Container) > 0
+            ),
+            0
+                  )
+    END AS Qty40,
+    CASE
+        WHEN [Transactions].[TpyeofService] = 'CustomsLogistics'
+             AND CHARINDEX('40´', [Transactions].[UnitPieaces]) > 0
+             And (
+                     CHARINDEX('40´HC', [Transactions].[UnitPieaces]) > 0
+                     Or CHARINDEX('40´HQ', [Transactions].[UnitPieaces]) > 0
+                     Or CHARINDEX('40´RH', [Transactions].[UnitPieaces]) > 0
+                     Or CHARINDEX('45´', [Transactions].[UnitPieaces]) > 0
+                 ) THEN
+            ISNULL([Transactions].[Noofpieces], 0)
+        ELSE
+            ISNULL(
+            (
+                SELECT Sum(ContainerLoaded.Qty) AS SumOfQty
+                FROM ContainerLoaded
+                WHERE ContainerLoaded.TransID = [Transactions].[TransID]
+                      AND CHARINDEX('20', ContainerLoaded.Container) = 0
+                      AND (
+                              CHARINDEX('HC', ContainerLoaded.Container) > 0
+                              OR CHARINDEX('HQ', ContainerLoaded.Container) > 0
+                              OR CHARINDEX('RH', ContainerLoaded.Container) > 0
+                          )
+                      AND (
+                              CHARINDEX('40', ContainerLoaded.Container) > 0
+                              OR CHARINDEX('45', ContainerLoaded.Container) > 0
+                          )
+            ),
+            0
+                  )
+    END AS Cont40HC,
+    CASE
+        WHEN [Transactions].[TpyeofService] = 'CustomsLogistics'
+             AND LEFT(ISNULL([Transactions].[UnitPieaces], ''), 2) = 'KG' THEN
+            ISNULL([Transactions].[Noofpieces], 0)
+        WHEN [Transactions].[TpyeofService] = 'ExpressTransactions' THEN
+            ISNULL([HAWB].[ChargeableWeight], 0)
+        WHEN CHARINDEX('AIR', UPPER([Transactions].[TpyeofService])) > 0 THEN
+            CASE
+                WHEN ISNULL([TransactionDetails].[WeightChargeable], 0) = 0 THEN
+                    [HAWBDETAILS].[WChargeable]
+                ELSE
+                    [TransactionDetails].[WeightChargeable]
+            END
+        WHEN ISNULL([TransactionDetails].[GrosWeight], 0) = 0 THEN
+            ISNULL([HAWBDETAILS].[GrossWeight], 0)
+        ELSE
+            ISNULL([TransactionDetails].[GrosWeight], 0)
+    END AS KGS,
+    CASE
+        WHEN [Transactions].[TpyeofService] = 'CustomsLogistics'
+             AND CHARINDEX('CBM', [Transactions].[UnitPieaces]) > 0 THEN
+            ISNULL([Transactions].[Noofpieces], 0)
+        WHEN ISNULL([HAWBDETAILS].[CBM], 0) = 0 THEN
+            ISNULL([TransactionDetails].[CBMSea], 0)
+        ELSE
+            ISNULL([HAWBDETAILS].[CBM], 0)
+    END AS CBM,
+    IsNull(
+    (
+        SELECT Sum(   CASE
+                          WHEN ISNULL(SellingRate.CurrencyRate, 0) = 0 THEN
+                              0
+                          ELSE
+                              ROUND(
+                                       CAST(SellingRate.Quantity * SellingRate.UnitPrice
+                                            * CASE
+                                                  WHEN ISNULL(SellingRate.ExtRateVND, 0) = 0 THEN
+                                                      ISNULL(SellingRate.ExtVND, 0)
+                                                  ELSE
+                                                      SellingRate.ExtRateVND
+                                              END AS numeric(26, 3)),
+                                       0
+                                   )
+                      END
+                  ) AS SumOfCurrencyRate
+        FROM SellingRate
+            RIGHT OUTER JOIN TransactionDetails AS TransDT
+                ON SellingRate.HAWBNO = TransDT.HWBNO
+        WHERE SellingRate.HAWBNO = [TransactionDetails].[HWBNO]
+    ),
+    0
+          )
+    + IsNull(
+      (
+          SELECT Sum(   CASE
+                            WHEN ISNULL(HandleServiceRate.ExtRate, 0) = 0 THEN
+                                0
+                            ELSE
+                                ROUND(
+                                         CAST(HandleServiceRate.Quantity * HandleServiceRate.UnitPrice
+                                              * CASE
+                                                    WHEN ISNULL(HandleServiceRate.ExtRateVND, 0) = 0 THEN
+                                                        ISNULL(HandleServiceRate.ExtVND, 0)
+                                                    ELSE
+                                                        HandleServiceRate.ExtRateVND
+                                                END AS numeric(26, 3)),
+                                         0
+                                     )
+                        END
+                    ) AS SumOfExtRate
+          FROM CargoOperationRequest
+              RIGHT OUTER JOIN TransactionDetails AS TransDT
+                  ON CargoOperationRequest.HBLNo = TransDT.HWBNO
+              LEFT OUTER JOIN HandleServiceRate
+                  ON CargoOperationRequest.RequestNo = HandleServiceRate.RequestID
+          WHERE CargoOperationRequest.HBLNo = [TransactionDetails].[HWBNO]
+                AND HandleServiceRate.Dpt <> 0
+      ),
+      0
+            ) AS SellingRate,
+    IsNull(
+    (
+        SELECT Sum(   CASE
+                          WHEN ISNULL(ProfitShares.ExtRate, 0) = 0 THEN
+                              0
+                          ELSE
+                              ROUND(
+                                       CAST((ProfitShares.Quantity * ProfitShares.UnitPrice
+                                             + CASE
+                                                   WHEN ISNULL(ProfitShares.NoInv, 0) <> 0
+                                                        AND ISNULL(ProfitShares.VAT, 0) >= 0 THEN
+                                                       ProfitShares.Quantity * ProfitShares.UnitPrice
+                                                       * ISNULL(ProfitShares.VAT, 0) / 100
+                                                   WHEN ISNULL(ProfitShares.NoInv, 0) <> 0
+                                                        AND ISNULL(ProfitShares.VAT, 0) < 0 THEN
+                                                       ABS(ProfitShares.VAT)
+                                                   ELSE
+                                                       0
+                                               END
+                                            ) * CASE
+                                                    WHEN ISNULL(ProfitShares.ExtRateVND, 0) = 0 THEN
+                                                        ISNULL(ProfitShares.ExtVND, 0)
+                                                    ELSE
+                                                        ProfitShares.ExtRateVND
+                                                END AS numeric(26, 3)),
+                                       0
+                                   )
+                      END
+                  ) AS SumOfExtRate
+        FROM ProfitShares
+            RIGHT OUTER JOIN TransactionDetails AS TransDT
+                ON ProfitShares.HAWBNO = TransDT.HWBNO
+        WHERE ProfitShares.HAWBNO = [TransactionDetails].[HWBNO]
+              AND ProfitShares.Dpt = 0
+              AND ProfitShares.KBck <> 0
+    ),
+    0
+          )
+    + IsNull(
+      (
+          SELECT Sum(   CASE
+                            WHEN ISNULL(ProfitSharesCost.ExtRate, 0) = 0 THEN
+                                0
+                            ELSE
+                                ROUND(
+                                         CAST((ProfitSharesCost.Quantity * ProfitSharesCost.UnitPrice
+                                               + CASE
+                                                     WHEN ISNULL(ProfitSharesCost.NoInv, 0) <> 0
+                                                          AND ISNULL(ProfitSharesCost.VAT, 0) >= 0 THEN
+                                                         ProfitSharesCost.Quantity * ProfitSharesCost.UnitPrice
+                                                         * ISNULL(ProfitSharesCost.VAT, 0) / 100
+                                                     WHEN ISNULL(ProfitSharesCost.NoInv, 0) <> 0
+                                                          AND ISNULL(ProfitSharesCost.VAT, 0) < 0 THEN
+                                                         ABS(ProfitSharesCost.VAT)
+                                                     ELSE
+                                                         0
+                                                 END
+                                              ) * CASE
+                                                      WHEN ISNULL(ProfitSharesCost.ExtRateVND, 0) = 0 THEN
+                                                          ISNULL(ProfitSharesCost.ExtVND, 0)
+                                                      ELSE
+                                                          ProfitSharesCost.ExtRateVND
+                                                  END AS numeric(26, 3)),
+                                         0
+                                     )
+                        END
+                    ) AS SumOfExtRate
+          FROM ProfitSharesCost
+              LEFT OUTER JOIN NameFeeDescription
+                  ON ProfitSharesCost.SortDes = NameFeeDescription.FeeCode
+          WHERE ProfitSharesCost.HAWBNO = [TransactionDetails].[HWBNO]
+                AND ProfitSharesCost.Dpt = 0
+                AND ProfitSharesCost.KBck = 0
+      ),
+      0
+            ) AS SharedProfit,
+    IsNull(
+    (
+        SELECT Sum(   CASE
+                          WHEN ISNULL(BuyingRateWithHBL.ExtRate, 0) = 0 THEN
+                              0
+                          ELSE
+                              ROUND(
+                                       CAST(BuyingRateWithHBL.Quantity * BuyingRateWithHBL.UnitPrice
+                                            * CASE
+                                                  WHEN ISNULL(BuyingRateWithHBL.ExtRateVND, 0) = 0 THEN
+                                                      ISNULL(BuyingRateWithHBL.ExtVND, 0)
+                                                  ELSE
+                                                      BuyingRateWithHBL.ExtRateVND
+                                              END AS numeric(26, 3)),
+                                       0
+                                   )
+                      END
+                  ) AS SumOfExtRate
+        FROM BuyingRateWithHBL
+            RIGHT OUTER JOIN TransactionDetails AS TransDT
+                ON BuyingRateWithHBL.HAWBNO = TransDT.HWBNO
+        WHERE BuyingRateWithHBL.HAWBNO = [TransactionDetails].[HWBNO]
+    ),
+    0
+          )
+    + IsNull(
+      (
+          SELECT Sum(   CASE
+                            WHEN ISNULL(HandleServiceRate.ExtRate, 0) = 0 THEN
+                                0
+                            ELSE
+                                ROUND(
+                                         CAST(HandleServiceRate.Quantity * HandleServiceRate.UnitPrice
+                                              * CASE
+                                                    WHEN ISNULL(HandleServiceRate.ExtRateVND, 0) = 0 THEN
+                                                        ISNULL(HandleServiceRate.ExtVND, 0)
+                                                    ELSE
+                                                        HandleServiceRate.ExtRateVND
+                                                END AS numeric(26, 3)),
+                                         0
+                                     )
+                        END
+                    ) AS SumOfExtRate
+          FROM CargoOperationRequest
+              RIGHT OUTER JOIN TransactionDetails AS TransDT
+                  ON CargoOperationRequest.HBLNo = TransDT.HWBNO
+              LEFT OUTER JOIN HandleServiceRate
+                  ON CargoOperationRequest.RequestNo = HandleServiceRate.RequestID
+          WHERE CargoOperationRequest.HBLNo = [TransactionDetails].[HWBNO]
+                AND HandleServiceRate.Dpt = 0
+      ),
+      0
+            )
+    + IsNull(
+      (
+          SELECT Sum(   CASE
+                            WHEN ISNULL(ProfitShares.ExtRate, 0) = 0 THEN
+                                0
+                            ELSE
+                                ROUND(
+                                         CAST((ProfitShares.Quantity * ProfitShares.UnitPrice
+                                               + CASE
+                                                     WHEN ISNULL(ProfitShares.NoInv, 0) <> 0
+                                                          AND ISNULL(ProfitShares.VAT, 0) >= 0 THEN
+                                                         ProfitShares.Quantity * ProfitShares.UnitPrice
+                                                         * ISNULL(ProfitShares.VAT, 0) / 100
+                                                     WHEN ISNULL(ProfitShares.NoInv, 0) <> 0
+                                                          AND ISNULL(ProfitShares.VAT, 0) < 0 THEN
+                                                         ABS(ProfitShares.VAT)
+                                                     ELSE
+                                                         0
+                                                 END
+                                              ) * CASE
+                                                      WHEN ISNULL(ProfitShares.ExtRateVND, 0) = 0 THEN
+                                                          ISNULL(ProfitShares.ExtVND, 0)
+                                                      ELSE
+                                                          ProfitShares.ExtRateVND
+                                                  END AS numeric(26, 3)),
+                                         0
+                                     )
+                        END
+                    ) AS SumOfExtRate
+          FROM ProfitShares
+              RIGHT OUTER JOIN TransactionDetails AS TransDT
+                  ON ProfitShares.HAWBNO = TransDT.HWBNO
+          WHERE ProfitShares.HAWBNO = [TransactionDetails].[HWBNO]
+                AND ProfitShares.Dpt = 0
+                AND ProfitShares.KBck = 0
+      ),
+      0
+            ) AS BuyingRate,
+    IsNull(
+    (
+        SELECT Sum(   CASE
+                          WHEN ISNULL(ProfitShares.ExtRate, 0) = 0 THEN
+                              0
+                          ELSE
+                              ROUND(
+                                       CAST(ProfitShares.Quantity * ProfitShares.UnitPrice
+                                            * CASE
+                                                  WHEN ISNULL(ProfitShares.ExtRateVND, 0) = 0 THEN
+                                                      ISNULL(ProfitShares.ExtVND, 0)
+                                                  ELSE
+                                                      ProfitShares.ExtRateVND
+                                              END AS numeric(26, 3)),
+                                       0
+                                   )
+                      END
+                  ) AS SumOfExtRate
+        FROM ProfitShares
+            RIGHT OUTER JOIN TransactionDetails AS TransDT
+                ON ProfitShares.HAWBNO = TransDT.HWBNO
+        WHERE ProfitShares.HAWBNO = [TransactionDetails].[HWBNO]
+              AND ProfitShares.Dpt <> 0
+    ),
+    0
+          ) AS OtherCharges,
+    CASE
+        WHEN ISNULL(TransactionDetails.ContactID, '') = '' THEN
+            ContactsList.LocalSalesTarget
+        ELSE
+            ContactsList_3.LocalSalesTarget
+    END AS SalesTarget,
+    CASE
+        WHEN ISNULL(TransactionDetails.ContactID, '') = '' THEN
+            ContactsList.Bonus
+        ELSE
+            ContactsList_3.Bonus
+    END AS Bonus,
+    CASE
+        WHEN ISNULL(TransactionDetails.ContactID, '') = '' THEN
+            Departments.DptSalesTarget
+        ELSE
+            Departments_2.DptSalesTarget
+    END AS DptSalesTarget,
+    CASE
+        WHEN ISNULL(TransactionDetails.ContactID, '') = '' THEN
+            Departments.DptBonus
+        ELSE
+            Departments_2.DptBonus
+    END AS DptBonus,
+    Transactions.AgentID AS KeyContact,
+    '' AS KeyContact,
+    ISNULL(Transactions.MAWB, '') AS MBLNO,
+    CASE
+        WHEN [Transactions].[TpyeofService] = 'AirExpTransactions' THEN
+            [Transactions].[FlghtNo]
+        WHEN CHARINDEX('SeaImp', [Transactions].[TpyeofService]) > 0 THEN
+            ISNULL([Transactions].[EstimatedVessel], '') + ' ' + ISNULL([Transactions].[ContSealNo], '')
+        WHEN [Transactions].[TpyeofService] = 'AirImpTransactions'
+             Or [Transactions].[TpyeofService] = 'CustomsLogistics' THEN
+            [Transactions].[EstimatedVessel]
+        ELSE
+    (
+        SELECT TOP 1
+            LTrim(ISNULL([HAWB_1].[LocalVessel], '') + ' ' + ISNULL([HAWB_1].[OceanVessel], '')) AS Vsl
+        FROM HAWB AS HAWB_1
+            RIGHT OUTER JOIN TransactionDetails
+                ON HAWB_1.HWBNO = TransactionDetails.HWBNO
+        WHERE TransactionDetails.TransID = [Transactions].[TransID]
+    )
+    END AS Vessel,
+    Transactions.TpyeofService,
+    ISNULL(HAWB.ATTN, '') AS Shipper,
+    ISNULL(HAWB.Consignee, '') AS Consignee,
+    IsNull(
+    (
+        SELECT Sum(   CASE
+                          WHEN ISNULL(BuyingRateWithHBL.ExtRate, 0) = 0 THEN
+                              0
+                          ELSE
+                              ROUND(
+                                       CAST(BuyingRateWithHBL.Quantity * BuyingRateWithHBL.UnitPrice
+                                            * CASE
+                                                  WHEN ISNULL(BuyingRateWithHBL.ExtRateVND, 0) = 0 THEN
+                                                      ISNULL(BuyingRateWithHBL.ExtVND, 0)
+                                                  ELSE
+                                                      BuyingRateWithHBL.ExtRateVND
+                                              END AS numeric(26, 3)),
+                                       0
+                                   )
+                      END
+                  ) AS SumOfExtRate
+        FROM BuyingRateWithHBL
+            RIGHT OUTER JOIN TransactionDetails AS TransDT
+                ON BuyingRateWithHBL.HAWBNO = TransDT.HWBNO
+        WHERE BuyingRateWithHBL.HAWBNO = [TransactionDetails].[HWBNO]
+    ),
+    0
+          ) AS DVBuyingRate,
+    IsNull(
+    (
+        SELECT Sum(   CASE
+                          WHEN ISNULL(HandleServiceRate.ExtRate, 0) = 0 THEN
+                              0
+                          ELSE
+                              ROUND(
+                                       CAST(HandleServiceRate.Quantity * HandleServiceRate.UnitPrice
+                                            * CASE
+                                                  WHEN ISNULL(HandleServiceRate.ExtRateVND, 0) = 0 THEN
+                                                      ISNULL(HandleServiceRate.ExtVND, 0)
+                                                  ELSE
+                                                      HandleServiceRate.ExtRateVND
+                                              END AS numeric(26, 3)),
+                                       0
+                                   )
+                      END
+                  ) AS SumOfExtRate
+        FROM CargoOperationRequest
+            RIGHT OUTER JOIN TransactionDetails AS TransDT
+                ON CargoOperationRequest.HBLNo = TransDT.HWBNO
+            LEFT OUTER JOIN HandleServiceRate
+                ON CargoOperationRequest.RequestNo = HandleServiceRate.RequestID
+        WHERE CargoOperationRequest.HBLNo = [TransactionDetails].[HWBNO]
+              AND HandleServiceRate.Dpt = 0
+    ),
+    0
+          ) AS HLCost,
+    IsNull(
+    (
+        SELECT Sum(   CASE
+                          WHEN ISNULL(ProfitShares.ExtRate, 0) = 0 THEN
+                              0
+                          ELSE
+                              ROUND(
+                                       CAST((ProfitShares.Quantity * ProfitShares.UnitPrice
+                                             + CASE
+                                                   WHEN ISNULL(ProfitShares.NoInv, 0) <> 0
+                                                        AND ISNULL(ProfitShares.VAT, 0) >= 0 THEN
+                                                       ProfitShares.Quantity * ProfitShares.UnitPrice
+                                                       * ISNULL(ProfitShares.VAT, 0) / 100
+                                                   WHEN ISNULL(ProfitShares.NoInv, 0) <> 0
+                                                        AND ISNULL(ProfitShares.VAT, 0) < 0 THEN
+                                                       ABS(ProfitShares.VAT)
+                                                   ELSE
+                                                       0
+                                               END
+                                            ) * CASE
+                                                    WHEN ISNULL(ProfitShares.ExtRateVND, 0) = 0 THEN
+                                                        ISNULL(ProfitShares.ExtVND, 0)
+                                                    ELSE
+                                                        ProfitShares.ExtRateVND
+                                                END AS numeric(26, 3)),
+                                       0
+                                   )
+                      END
+                  ) AS SumOfExtRate
+        FROM ProfitShares
+            RIGHT OUTER JOIN TransactionDetails AS TransDT
+                ON ProfitShares.HAWBNO = TransDT.HWBNO
+        WHERE ProfitShares.HAWBNO = [TransactionDetails].[HWBNO]
+              AND ProfitShares.Dpt = 0
+              AND ProfitShares.KBck = 0
+    ),
+    0
+          ) AS OtherCredit,
+    ISNULL(
+    (
+        SELECT ISNULL(TKSo, '') + CASE
+                                      WHEN NgayDangKy IS NULL THEN
+                                          ''
+                                      ELSE
+                                          '/'
+                                  END + CASE
+                                            WHEN NgayDangKy IS NULL THEN
+                                                ''
+                                            ELSE
+                                                Convert(Char(12), NgayDangKy, 107)
+                                        END AS SoTK
+        FROM CustomsDeclaration
+        WHERE MasoTK = [TransactionDetails].[CustomsID]
+    ),
+    ''
+          ) AS CustomsNo,
+    CASE
+        WHEN [Transactions].[TpyeofService] = 'CustomsLogistics'
+             AND CHARINDEX('45´', [Transactions].[UnitPieaces]) > 0 THEN
+            ISNULL([Transactions].[Noofpieces], 0)
+        ELSE
+            ISNULL(
+            (
+                SELECT Sum(ContainerLoaded.Qty) AS SumOfQty
+                FROM ContainerLoaded
+                WHERE ContainerLoaded.TransID = [Transactions].[TransID]
+                      AND CHARINDEX('45', ContainerLoaded.Container) > 0
+            ),
+            0
+                  )
+    END AS Cont45,
+    ISNULL(HAWB.BillRecipient, '') AS BillRecipient,
+    ISNULL(Transactions.Description, '') AS Commodity,
+    CASE
+        WHEN ISNULL(HAWB.PlaceDelivery, '') = '' THEN
+            ISNULL(Transactions.PortofUnlading, '')
+        ELSE
+            HAWB.PlaceDelivery
+    END AS Destination,
+    CASE
+        WHEN Transactions.TpyeofService = 'ExpressTransactions' THEN
+            ISNULL(Transactions.RouteDelivery, '')
+        WHEN Transactions.TpyeofService = 'InlandTrucking' THEN
+            ISNULL(TransactionDetails.ServiceMode, '')
+        ELSE
+            ISNULL(Transactions.Starus, '')
+    END AS Bktype,
+    ISNULL(TransactionDetails.ShipmentType, '') AS ShipmentSource,
+    CAST(0 AS numeric(26, 3)) AS FixedProfit,
+    (ISNULL(
+     (
+         SELECT SUM(tbOBH.TotalValue * tbOBH.ExtVND) AS OBH
+         FROM ProfitShares AS tbOBH
+         WHERE tbOBH.HAWBNO = [TransactionDetails].[HWBNO]
+               AND ISNULL(tbOBH.OBH, 0) <> 0
+               AND ISNULL(tbOBH.Dpt, 0) = 0
+     ),
+     0
+           ) + ISNULL(
+               (
+                   SELECT SUM(tbOBH.TotalValue * tbOBH.ExtVND) AS OBH
+                   FROM BuyingRateWithHBL AS tbOBH
+                   WHERE tbOBH.HAWBNO = [TransactionDetails].[HWBNO]
+                         AND ISNULL(tbOBH.OBH, 0) <> 0
+               ),
+               0
+                     ) + ISNULL(
+                         (
+                             SELECT SUM(tbOBH.TotalValue * tbOBH.ExtVND) AS OBH
+                             FROM HandleServiceRate AS tbOBH
+                                 LEFT OUTER JOIN CargoOperationRequest AS RQLinkOBH
+                                     ON tbOBH.RequestID = RQLinkOBH.RequestNo
+                             WHERE RQLinkOBH.HBLNo = [TransactionDetails].[HWBNO]
+                                   AND ISNULL(tbOBH.OBH, 0) <> 0
+                                   AND ISNULL(tbOBH.Dpt, 0) = 0
+                         ),
+                         0
+                               )
+    ) AS OBHAmount,
+    'VND' AS lCCurrency,
+    ISNULL(HAWB.HBShipperID, '') AS ShipperID,
+    ISNULL(
+    (
+        SELECT MasterShipper.PartnerName
+        FROM Partners AS MasterShipper
+        WHERE MasterShipper.PartnerID = [HAWB].[HBShipperID]
+    ),
+    ''
+          ) AS MasterShipper,
+    ISNULL(HAWB.ConsigneeID, '') AS ConsigneeID,
+    ISNULL(
+    (
+        SELECT MasterConsignee.PartnerName
+        FROM Partners AS MasterConsignee
+        WHERE MasterConsignee.PartnerID = [HAWB].[ConsigneeID]
+    ),
+    ''
+          ) AS MasterConsignee,
+    TransactionDetails.ShipperID AS CustomerID,
+    Transactions.ArrivalDate,
+    (ISNULL(
+     (
+         SELECT SUM(tbOBH.TotalValue * tbOBH.ExtVND) AS OBH
+         FROM SellingRate AS tbOBH
+         WHERE tbOBH.HAWBNO = [TransactionDetails].[HWBNO]
+               AND ISNULL(tbOBH.OBH, 0) <> 0
+     ),
+     0
+           ) + ISNULL(
+               (
+                   SELECT SUM(tbOBH.TotalValue * tbOBH.ExtVND) AS OBH
+                   FROM ProfitShares AS tbOBH
+                   WHERE tbOBH.HAWBNO = [TransactionDetails].[HWBNO]
+                         AND ISNULL(tbOBH.OBH, 0) <> 0
+                         AND ISNULL(tbOBH.Dpt, 0) <> 0
+               ),
+               0
+                     ) + ISNULL(
+                         (
+                             SELECT SUM(tbOBH.TotalValue * tbOBH.ExtVND) AS OBH
+                             FROM HandleServiceRate AS tbOBH
+                                 LEFT OUTER JOIN CargoOperationRequest AS RQLinkOBH
+                                     ON tbOBH.RequestID = RQLinkOBH.RequestNo
+                             WHERE RQLinkOBH.HBLNo = [TransactionDetails].[HWBNO]
+                                   AND ISNULL(tbOBH.OBH, 0) <> 0
+                                   AND ISNULL(tbOBH.Dpt, 0) <> 0
+                         ),
+                         0
+                               )
+    ) AS OBHAmountCLL,
+    ISNULL(
+    (
+        SELECT Sum(ContainerLoadedHBL.Qty) AS SumOfQty
+        FROM ContainerLoadedHBL
+        WHERE ContainerLoadedHBL.HBLNo = [TransactionDetails].[HWBNO]
+              AND (
+                      CHARINDEX('20', ContainerLoadedHBL.Container) > 0
+                      OR CHARINDEX('22', ContainerLoadedHBL.Container) > 0
+                  )
+    ),
+    0
+          ) AS HQty20,
+    ISNULL(
+    (
+        SELECT Sum(ContainerLoadedHBL.Qty) AS SumOfQty
+        FROM ContainerLoadedHBL
+        WHERE ContainerLoadedHBL.HBLNo = [TransactionDetails].[HWBNO]
+              AND CHARINDEX('20', ContainerLoadedHBL.Container) = 0
+              AND CHARINDEX('HC', ContainerLoadedHBL.Container) = 0
+              AND CHARINDEX('HQ', ContainerLoadedHBL.Container) = 0
+              AND CHARINDEX('RH', ContainerLoadedHBL.Container) = 0
+              AND CHARINDEX('45', ContainerLoadedHBL.Container) = 0
+              AND CHARINDEX('40', ContainerLoadedHBL.Container) > 0
+    ),
+    0
+          ) AS HQty40,
+    ISNULL(
+    (
+        SELECT Sum(ContainerLoadedHBL.Qty) AS SumOfQty
+        FROM ContainerLoadedHBL
+        WHERE ContainerLoadedHBL.HBLNo = [TransactionDetails].[HWBNO]
+              AND CHARINDEX('20', ContainerLoadedHBL.Container) = 0
+              AND CHARINDEX('45', ContainerLoadedHBL.Container) = 0
+              AND (
+                      CHARINDEX('HC', ContainerLoadedHBL.Container) > 0
+                      OR CHARINDEX('HQ', ContainerLoadedHBL.Container) > 0
+                      OR CHARINDEX('RH', ContainerLoadedHBL.Container) > 0
+                  )
+              AND (CHARINDEX('40', ContainerLoadedHBL.Container) > 0)
+    ),
+    0
+          ) AS HCont40HC,
+    ISNULL(
+    (
+        SELECT Sum(ContainerLoadedHBL.Qty) AS SumOfQty
+        FROM ContainerLoadedHBL
+        WHERE ContainerLoadedHBL.HBLNo = [TransactionDetails].[HWBNO]
+              AND CHARINDEX('45', ContainerLoadedHBL.Container) > 0
+    ),
+    0
+          ) AS HQty45,
+    IsNull(
+    (
+        SELECT Sum(   CASE
+                          WHEN ISNULL(SellingRate.CurrencyRate, 0) = 0 THEN
+                              0
+                          ELSE
+                              ROUND(
+                                       CAST(SellingRate.Quantity * SellingRate.UnitPrice
+                                            * CASE
+                                                  WHEN ISNULL(SellingRate.ExtRateVND, 0) = 0 THEN
+                                                      ISNULL(SellingRate.ExtVND, 0)
+                                                  ELSE
+                                                      SellingRate.ExtRateVND
+                                              END AS numeric(26, 3)),
+                                       0
+                                   )
+                      END
+                  ) AS SumOfCurrencyRate
+        FROM SellingRate
+            RIGHT OUTER JOIN TransactionDetails AS TransDT
+                ON SellingRate.HAWBNO = TransDT.HWBNO
+        WHERE SellingRate.HAWBNO = [TransactionDetails].[HWBNO]
+              AND CHARINDEX('TRUCK', SellingRate.Description) = 0
+              AND CHARINDEX('TRUCK', ISNULL(SellingRate.SortDes, '')) = 0
+    ),
+    0
+          ) AS DVSellingRate,
+    IsNull(
+    (
+        SELECT Sum(   CASE
+                          WHEN ISNULL(SellingRate.CurrencyRate, 0) = 0 THEN
+                              0
+                          ELSE
+                              ROUND(
+                                       CAST(SellingRate.Quantity * SellingRate.UnitPrice
+                                            * CASE
+                                                  WHEN ISNULL(SellingRate.ExtRateVND, 0) = 0 THEN
+                                                      ISNULL(SellingRate.ExtVND, 0)
+                                                  ELSE
+                                                      SellingRate.ExtRateVND
+                                              END AS numeric(26, 3)),
+                                       0
+                                   )
+                      END
+                  ) AS SumOfCurrencyRate
+        FROM SellingRate
+            RIGHT OUTER JOIN TransactionDetails AS TransDT
+                ON SellingRate.HAWBNO = TransDT.HWBNO
+            LEFT OUTER JOIN NameFeeDescription
+                ON SellingRate.SortDes = NameFeeDescription.FeeCode
+        WHERE (
+                  CHARINDEX('TRUCK', SellingRate.Description) > 0
+                  OR CHARINDEX('TRUCK', ISNULL(SellingRate.SortDes, '')) > 0
+              )
+              AND SellingRate.HAWBNO = [TransactionDetails].[HWBNO]
+    ),
+    0
+          )
+    + IsNull(
+      (
+          SELECT Sum(   CASE
+                            WHEN ISNULL(ProfitShares.ExtRate, 0) = 0 THEN
+                                0
+                            ELSE
+                                ROUND(
+                                         CAST(ProfitShares.Quantity * ProfitShares.UnitPrice
+                                              * CASE
+                                                    WHEN ISNULL(ProfitShares.ExtRateVND, 0) = 0 THEN
+                                                        ISNULL(ProfitShares.ExtVND, 0)
+                                                    ELSE
+                                                        ProfitShares.ExtRateVND
+                                                END AS numeric(26, 3)),
+                                         0
+                                     )
+                        END
+                    ) AS SumOfExtRate
+          FROM ProfitShares
+              RIGHT OUTER JOIN TransactionDetails AS TransDT
+                  ON ProfitShares.HAWBNO = TransDT.HWBNO
+              LEFT OUTER JOIN NameFeeDescription
+                  ON ProfitShares.SortDes = NameFeeDescription.FeeCode
+          WHERE ProfitShares.HAWBNO = [TransactionDetails].[HWBNO]
+                AND ProfitShares.Dpt <> 0
+                AND (
+                        ISNULL(ProfitShares.TT, 0) <> 0
+                        OR CHARINDEX('TRUCK', ProfitShares.Notes) > 0
+                        OR CHARINDEX('TRUCK', ISNULL(ProfitShares.SortDes, '')) > 0
+                    )
+      ),
+      0
+            ) AS DVRevTruck,
+    HAWB.DocumentReleaseDate,
+    CASE
+        WHEN ISNULL(TransactionDetails.MAWBSE, '') <> '' THEN
+            TransactionDetails.MAWBSE
+        ELSE
+            ISNULL(TransactionDetails.MAWB, '')
+    END AS RelatedHBLNo,
+    CASE
+        WHEN ISNULL(TransactionDetails.MAWB, '') <> '' THEN
+        (
+            SELECT TransID
+            FROM TransactionDetails AS RelatedTransDetails
+            WHERE HWBNO = TransactionDetails.MAWB
+        )
+        ELSE
+            ''
+    END AS RelatedJobNo,
+    Departments_1.CmpID AS HandleOffice,
+    CASE
+        WHEN ISNULL(TransactionDetails.ContactID, '') = '' THEN
+            ISNULL(Departments.CmpID, '')
+        ELSE
+            ISNULL(Departments_2.CmpID, '')
+    END AS SalesOffice,
+    ISNULL(ContactsList_2.ContactName, '') AS Creator,
+    ISNULL(Transactions.GrossWeight, 0) AS MGW,
+    ISNULL(Transactions.ChargeableWeight, 0) AS MCW,
+    IsNull(
+    (
+        SELECT Sum(   CASE
+                          WHEN ISNULL(ProfitShares.ExtRate, 0) = 0 THEN
+                              0
+                          ELSE
+                              ROUND(
+                                       CAST(ProfitShares.Quantity * ProfitShares.UnitPrice
+                                            * CASE
+                                                  WHEN ISNULL(ProfitShares.ExtRateVND, 0) = 0 THEN
+                                                      ISNULL(ProfitShares.ExtVND, 0)
+                                                  ELSE
+                                                      ProfitShares.ExtRateVND
+                                              END AS numeric(26, 3)),
+                                       0
+                                   )
+                      END * CASE
+                                WHEN ProfitShares.Dpt = 0 THEN
+                                    -1
+                                ELSE
+                                    1
+                            END
+                  ) AS SumOfExtRate
+        FROM ProfitShares
+            RIGHT OUTER JOIN TransactionDetails AS TransDT
+                ON ProfitShares.HAWBNO = TransDT.HWBNO
+            LEFT OUTER JOIN NameFeeDescription
+                ON ProfitShares.SortDes = NameFeeDescription.FeeCode
+        WHERE ProfitShares.HAWBNO = [TransactionDetails].[HWBNO]
+              AND ISNULL(ProfitShares.Gainloss, 0) <> 0
+    ),
+    0
+          ) AS GainLoss,
+    CASE
+        WHEN ISNULL([TransactionDetails].[GrosWeight], 0) = 0 THEN
+            ISNULL([HAWBDETAILS].[GrossWeight], 0)
+        ELSE
+            ISNULL([TransactionDetails].[GrosWeight], 0)
+    END AS HGW,
+    CASE
+        WHEN [Transactions].[TpyeofService] = 'CustomsLogistics'
+             AND CHARINDEX('20´RF', [Transactions].[UnitPieaces]) > 0 THEN
+            ISNULL([Transactions].[Noofpieces], 0)
+        ELSE
+            ISNULL(
+            (
+                SELECT Sum(ContainerLoaded.Qty) AS SumOfQty
+                FROM ContainerLoaded
+                WHERE ContainerLoaded.TransID = [Transactions].[TransID]
+                      AND CHARINDEX('20´RF', ContainerLoaded.Container) > 0
+            ),
+            0
+                  )
+    END AS Qty20RF,
+    CASE
+        WHEN [Transactions].[TpyeofService] = 'CustomsLogistics'
+             AND CHARINDEX('20´RQ', [Transactions].[UnitPieaces]) > 0 THEN
+            ISNULL([Transactions].[Noofpieces], 0)
+        ELSE
+            ISNULL(
+            (
+                SELECT Sum(ContainerLoaded.Qty) AS SumOfQty
+                FROM ContainerLoaded
+                WHERE ContainerLoaded.TransID = [Transactions].[TransID]
+                      AND CHARINDEX('20´RQ', ContainerLoaded.Container) > 0
+            ),
+            0
+                  )
+    END AS Qty20RQ,
+    CASE
+        WHEN [Transactions].[TpyeofService] = 'CustomsLogistics'
+             AND (
+                     CHARINDEX('40´RQ', [Transactions].[UnitPieaces]) > 0
+                     OR CHARINDEX('40´RH', [Transactions].[UnitPieaces]) > 0
+                 ) THEN
+            ISNULL([Transactions].[Noofpieces], 0)
+        ELSE
+            ISNULL(
+            (
+                SELECT Sum(ContainerLoaded.Qty) AS SumOfQty
+                FROM ContainerLoaded
+                WHERE ContainerLoaded.TransID = [Transactions].[TransID]
+                      AND (
+                              CHARINDEX('40´RQ', ContainerLoaded.Container) > 0
+                              OR CHARINDEX('40´RH', ContainerLoaded.Container) > 0
+                          )
+            ),
+            0
+                  )
+    END AS Qty40RQ,
+    ISNULL(
+    (
+        SELECT Sum(ContainerLoadedHBL.Qty) AS SumOfQty
+        FROM ContainerLoadedHBL
+        WHERE ContainerLoadedHBL.HBLNo = [TransactionDetails].[HWBNO]
+              AND CHARINDEX('20´RF', ContainerLoadedHBL.Container) > 0
+    ),
+    0
+          ) AS HQty20RF,
+    ISNULL(
+    (
+        SELECT Sum(ContainerLoadedHBL.Qty) AS SumOfQty
+        FROM ContainerLoadedHBL
+        WHERE ContainerLoadedHBL.HBLNo = [TransactionDetails].[HWBNO]
+              AND CHARINDEX('20´RQ', ContainerLoadedHBL.Container) > 0
+    ),
+    0
+          ) AS HQty20RQ,
+    ISNULL(
+    (
+        SELECT Sum(ContainerLoadedHBL.Qty) AS SumOfQty
+        FROM ContainerLoadedHBL
+        WHERE ContainerLoadedHBL.HBLNo = [TransactionDetails].[HWBNO]
+              AND CHARINDEX('40´RQ', ContainerLoadedHBL.Container) > 0
+    ),
+    0
+          ) AS HQty40RQ,
+    CASE
+        WHEN Transactions.TpyeofService = 'CustomsLogistics' THEN
+            Transactions.Ref
+        WHEN LEFT(Transactions.TpyeofService, 3) = 'Sea' THEN
+            CASE
+                WHEN ISNULL(Transactions.OMB, '') <> '' THEN
+                    Transactions.OMB
+                ELSE
+                    ISNULL(HAWB.PONo, '')
+            END
+        ELSE
+            ISNULL(HAWB.PONo, '')
+    END AS PONo,
+    CASE
+        WHEN CHARINDEX('Trucking', Transactions.TpyeofService) > 0 THEN
+            CASE
+                WHEN ISDATE(TransactionDetails.AcDeliveryDate) <> 0 THEN
+                    TransactionDetails.AcDeliveryDate
+                ELSE
+                    TransactionDetails.ETA
+            END
+        WHEN CHARINDEX('Exp', Transactions.TpyeofService) > 0 THEN
+            CASE
+                WHEN SignDate IS NOT NULL THEN
+                    SignDate
+                ELSE
+                    TransactionDetails.ETA
+            END
+        ELSE
+            CASE
+                WHEN CussignedDate IS NOT NULL THEN
+                    CussignedDate
+                ELSE
+                    TransactionDetails.ETA
+            END
+    END AS DeliveryDate,
+    ISNULL(Transactions.ExpressNotes, '') + CASE
+                                                WHEN ISNULL(Transactions.ExpressNotes, '') <> ''
+                                                     AND ISNULL(TransactionDetails.Notes, '') <> '' THEN
+                                                    CHAR(13) + CHAR(10)
+                                                ELSE
+                                                    ''
+                                            END + ISNULL(TransactionDetails.Notes, '') AS Notes,
+    Transactions.TransDate,
+    ISNULL(Transactions.Delivered, 0) AS Delivered,
+    CAST(0 AS numeric(26, 3)) AS ExceptionCost,
+    CASE
+        WHEN ISNULL(HAWB.ReferrenceNo, '') <> '' THEN
+            HAWB.ReferrenceNo
+        ELSE
+            ISNULL(TransactionDetails.BookingID, '')
+    END AS ReferrenceNo,
+    CASE
+        WHEN CHARINDEX('SeaExp', Transactions.TpyeofService) > 0 THEN
+            CASE
+                WHEN ISNULL(HAWB.SeafreightPP, 0) <> 0
+                     AND ISNULL(HAWB.Document, 0) <> 0 THEN
+                    'PREPAID'
+                WHEN ISNULL(HAWB.SeafreightCC, 0) <> 0
+                     AND ISNULL(HAWB.Document, 0) <> 0 THEN
+                    'COLLECT'
+                ELSE
+            (
+                SELECT TOP 1
+                    CASE
+                        WHEN ISNULL(Collect, 0) <> 0 THEN
+                            'COLLECT'
+                        ELSE
+                            'PREPAID'
+                    END AS PMTERM
+                FROM HAWBRATE
+                WHERE ISNULL(FC, 0) <> 0
+                      AND HWBNO = [TransactionDetails].[HWBNO]
+            )
+            END
+        WHEN CHARINDEX('AirExp', Transactions.TpyeofService) > 0 THEN
+            CASE
+                WHEN ISNULL(HAWB.WTVALPP, 0) <> 0 THEN
+                    'PREPAID'
+                WHEN ISNULL(HAWB.WTVALCC, 0) <> 0 THEN
+                    'COLLECT'
+                ELSE
+                    HAWB.AccountingInfo
+            END
+        ELSE
+            HAWB.AccountingInfo
+    END AS HFreightTerm,
+    TransactionDetails.HWBNO AS ORHBLNO,
+    CASE
+        WHEN ISNULL(Transactions.ContactID, '') <> '' THEN
+        (
+            SELECT ContactName
+            FROM ContactsList AS OPS
+            WHERE OPS.ContactID = [Transactions].[ContactID]
+        )
+        ELSE
+            ''
+    END AS OPIC,
+    ISNULL(TransactionDetails.SC, '') AS TKDeliveryStatus,
+    Transactions.WhoisMaking AS CreatorUser,
+    (
+        SELECT TOP 1
+            CASE
+                WHEN CHARINDEX('(', FieldKey) > 0 THEN
+                    LEFT(FieldKey, CHARINDEX('(', FieldKey) - 1)
+                ELSE
+                    FieldKey
+            END AS FieldKey
+        FROM BuyingRateWithHBL
+        WHERE HAWBNO = [TransactionDetails].[MAWB]
+              AND ISNULL(FieldKey, '') <> ''
+        ORDER BY IDKeyIndex DESC
+    ) AS CSSTAFF,
+    (
+        SELECT TOP 1
+            TransactionInfo.WhoisMaking
+        FROM TransactionInfo
+        WHERE HAWBNO = [TransactionDetails].[HWBNO]
+              AND (
+                      CHARINDEX('ADVANCE', DescriptionDisplay) > 0
+                      OR CHARINDEX('ADVANCE', Description) > 0
+                      OR CHARINDEX('SETTLE', DescriptionDisplay) > 0
+                      OR CHARINDEX('SETTLE', Description) > 0
+                  )
+        ORDER BY TransactionInfo.InfoDate DESC
+    ) AS OPLOGSTAFF,
+    ISNULL(TransactionDetails.PickupAt, '') AS PickupAt,
+    ISNULL(TransactionDetails.Deliveryat, '') AS Deliveryat,
+    ISNULL(TransactionDetails.ExConsigneeSign, '') AS Driver,
+    (
+        SELECT TOP 1
+            TransactionInfo.InfoDate
+        FROM TransactionInfo
+        WHERE HAWBNO = [TransactionDetails].[HWBNO]
+              AND (
+                      CHARINDEX('CARGO RECEIPT ATT', DescriptionDisplay) > 0
+                      OR CHARINDEX('CARGO RECEIPT ATT', Description) > 0
+                  )
+        ORDER BY TransactionInfo.InfoDate DESC
+    ) AS CARGORECEIPTATTACH,
+    CAST(0 AS numeric(26, 3)) AS ProfitLC,
+    ISNULL(Transactions.Approved, 0) AS Approved,
+    CASE
+        WHEN ISNULL(TransactionDetails.MAWBSE, '') <> '' THEN
+        (
+            SELECT TOP 1
+                TransMT.TpyeofService
+            FROM TransactionDetails AS TransDT
+                RIGHT OUTER JOIN Transactions AS TransMT
+                    ON TransDT.TransID = TransMT.TransID
+            WHERE TransDT.HWBNO = [TransactionDetails].[MAWBSE]
+        )
+        WHEN ISNULL(TransactionDetails.MAWB, '') <> '' THEN
+        (
+            SELECT TOP 1
+                TransMT.TpyeofService
+            FROM TransactionDetails AS TransDT
+                RIGHT OUTER JOIN Transactions AS TransMT
+                    ON TransDT.TransID = TransMT.TransID
+            WHERE TransDT.HWBNO = [TransactionDetails].[MAWB]
+        )
+        ELSE
+            Transactions.TpyeofService
+    END AS RService,
+    ISNULL(Transactions.HandlingInformation, '') AS CargoOP,
+    ISNULL(TransactionDetails.Quantity, 0) AS PCSQty,
+    ISNULL(TransactionDetails.UnitDetail, '') AS PCSUnit,
+    CASE
+        WHEN ISNULL(TransactionDetails.MAWBSE, '') <> '' THEN
+            3
+        WHEN ISNULL(TransactionDetails.MAWB, '') <> '' THEN
+            2
+        ELSE
+            0
+    END AS SVORDER,
+    ISNULL([Partners_2].[VIP], '') AS Network,
+    CASE
+        WHEN ISDATE(Transactions.Revision) <> 0 THEN
+            Transactions.Revision
+        ELSE
+            Transactions.LoadingDate
+    END AS ShipmentDate,
+    Transactions.DestinationDate AS FinishedDate,
+    CAST(ISNULL(   CASE
+                       WHEN LEFT(Transactions.TpyeofService, 6) = 'SeaExp' THEN
+                           HAWBDETAILS.MaskNos
+                       WHEN LEFT(Transactions.TpyeofService, 6) = 'SeaImp' THEN
+                           HAWB.ShippingMarkImport
+                       WHEN Transactions.TpyeofService = 'InlandTrucking' THEN
+                           TransactionDetails.ContSealNo
+                       WHEN Transactions.TpyeofService = 'CustomsLogistics' THEN
+                       (
+                           SELECT TOP 1
+                               Notes
+                           FROM ContainerLoaded
+                           WHERE ISNULL(Notes, '') <> ''
+                                 AND TransID = [Transactions].[TransID]
+                       )
+                       ELSE
+                           ''
+                   END,
+                   ''
+               ) AS NVARCHAR(1000)) AS ContainerNo,
+    CASE
+        WHEN [Transactions].[TpyeofService] = 'CustomsLogistics' THEN
+            LTRIM(STR(ISNULL([Transactions].[Noofpieces], 0)))
+            + CASE
+                  WHEN ISNULL([Transactions].[UnitPieaces], '') <> '' THEN
+                      ' ' + ISNULL([Transactions].[UnitPieaces], '')
+                  ELSE
+                      ''
+              END
+        ELSE
+            CASE
+                WHEN ISNULL([TransactionDetails].[Quantity], 0) = 0 THEN
+                    ISNULL([HAWBDETAILS].[NoPieces], '')
+                ELSE
+                    LTRIM(STR(ISNULL([TransactionDetails].[Quantity], 0)))
+                    + UPPER(   CASE
+                                   WHEN ISNULL([TransactionDetails].[UnitDetail], '') <> '' THEN
+                                       ' ' + [TransactionDetails].[UnitDetail]
+                                   ELSE
+                                       ''
+                               END
+                           )
+            END
+    END AS CTNS,
+    ISNULL(Transactions.Noofpieces, 0) AS MCTNS,
+    ISNULL(Transactions.UnitPieaces, '') AS MCTNSUnit,
+    CASE
+        WHEN ISNULL(TransactionDetails.ContactID, '') = '' THEN
+            ContactsList.AirVLTarget
+        ELSE
+            ContactsList_3.AirVLTarget
+    END AS AirVLTarget,
+    CASE
+        WHEN ISNULL(TransactionDetails.ContactID, '') = '' THEN
+            ContactsList.TUESTarget
+        ELSE
+            ContactsList_3.TUESTarget
+    END AS TUESTarget,
+    CASE
+        WHEN ISNULL(TransactionDetails.ContactID, '') = '' THEN
+            ContactsList.CBMTarget
+        ELSE
+            ContactsList_3.CBMTarget
+    END AS CBMTarget,
+    CASE
+        WHEN CHARINDEX('Imp', Transactions.TpyeofService) > 0 THEN
+            Transactions.ArrivalDate
+        ELSE
+            Transactions.LoadingDate
+    END AS ATD,
+    CASE
+        WHEN CHARINDEX('Imp', Transactions.TpyeofService) > 0 THEN
+            Transactions.LoadingDate
+        ELSE
+            Transactions.ArrivalDate
+    END AS ATA,
+    ISNULL(
+    (
+        SELECT Sum(ContainerLoadedHBL.Qty) AS SumOfQty
+        FROM ContainerLoadedHBL
+        WHERE ContainerLoadedHBL.HBLNo = [TransactionDetails].[HWBNO]
+              AND CHARINDEX('20´OT', ContainerLoadedHBL.Container) > 0
+    ),
+    0
+          ) AS HQty20OT,
+    ISNULL(
+    (
+        SELECT Sum(ContainerLoadedHBL.Qty) AS SumOfQty
+        FROM ContainerLoadedHBL
+        WHERE ContainerLoadedHBL.HBLNo = [TransactionDetails].[HWBNO]
+              AND CHARINDEX('20´HG', ContainerLoadedHBL.Container) > 0
+    ),
+    0
+          ) AS HQty20HG,
+    ISNULL(
+    (
+        SELECT Sum(ContainerLoadedHBL.Qty) AS SumOfQty
+        FROM ContainerLoadedHBL
+        WHERE ContainerLoadedHBL.HBLNo = [TransactionDetails].[HWBNO]
+              AND CHARINDEX('20´TK', ContainerLoadedHBL.Container) > 0
+    ),
+    0
+          ) AS HQty20TK,
+    ISNULL(
+    (
+        SELECT Sum(ContainerLoadedHBL.Qty) AS SumOfQty
+        FROM ContainerLoadedHBL
+        WHERE ContainerLoadedHBL.HBLNo = [TransactionDetails].[HWBNO]
+              AND CHARINDEX('40´FR', ContainerLoadedHBL.Container) > 0
+    ),
+    0
+          ) AS HQty40FR,
+    ISNULL(
+    (
+        SELECT Sum(ContainerLoadedHBL.Qty) AS SumOfQty
+        FROM ContainerLoadedHBL
+        WHERE ContainerLoadedHBL.HBLNo = [TransactionDetails].[HWBNO]
+              AND CHARINDEX('40´OT', ContainerLoadedHBL.Container) > 0
+    ),
+    0
+          ) AS HQty40OT,
+    ISNULL(
+    (
+        SELECT Sum(ContainerLoadedHBL.Qty) AS SumOfQty
+        FROM ContainerLoadedHBL
+        WHERE ContainerLoadedHBL.HBLNo = [TransactionDetails].[HWBNO]
+              AND CHARINDEX('40´HG', ContainerLoadedHBL.Container) > 0
+    ),
+    0
+          ) AS HQty40HG,
+    ISNULL(
+    (
+        SELECT Sum(ContainerLoadedHBL.Qty) AS SumOfQty
+        FROM ContainerLoadedHBL
+        WHERE ContainerLoadedHBL.HBLNo = [TransactionDetails].[HWBNO]
+              AND CHARINDEX('40´TK', ContainerLoadedHBL.Container) > 0
+    ),
+    0
+          ) AS HQty40TK,
+    CASE
+        WHEN Transactions.TpyeofService = 'AirExpTransactions' THEN
+            CASE
+                WHEN ISNULL(HAWB.LastDestination, '') <> '' THEN
+                (
+                    SELECT TOP 1
+                        AP.Country
+                    FROM Airports AS AP
+                    WHERE AP.AirPortName = [HAWB].[LastDestination]
+                )
+                ELSE
+                    ''
+            END
+        WHEN CHARINDEX('SeaExp', Transactions.TpyeofService) > 0 THEN
+            CASE
+                WHEN ISNULL(HAWB.PlaceDelivery, '') <> '' THEN
+                (
+                    SELECT TOP 1
+                        AP.Country
+                    FROM Airports AS AP
+                    WHERE AP.AirPortName = [HAWB].[PlaceDelivery]
+                )
+                ELSE
+                    ''
+            END
+        WHEN CHARINDEX('Imp', Transactions.TpyeofService) > 0
+             OR Transactions.TpyeofService = 'ExpressTransactions' THEN
+            CASE
+                WHEN ISNULL(Transactions.PortofLading, '') <> '' THEN
+                (
+                    SELECT TOP 1
+                        AP.Country
+                    FROM Airports AS AP
+                    WHERE AP.AirPortName = [Transactions].[PortofLading]
+                )
+                ELSE
+                    ''
+            END
+        ELSE
+            ''
+    END AS Country,
+    Transactions.TransID AS ORJOBNO,
+    IsNull(
+    (
+        SELECT Sum(   CASE
+                          WHEN ISNULL(ProfitShares.ExtRate, 0) = 0 THEN
+                              0
+                          ELSE
+                              ROUND(
+                                       CAST((ProfitShares.Quantity * ProfitShares.UnitPrice
+                                             + CASE
+                                                   WHEN ISNULL(ProfitShares.NoInv, 0) <> 0
+                                                        AND ISNULL(ProfitShares.VAT, 0) >= 0 THEN
+                                                       ProfitShares.Quantity * ProfitShares.UnitPrice
+                                                       * ISNULL(ProfitShares.VAT, 0) / 100
+                                                   WHEN ISNULL(ProfitShares.NoInv, 0) <> 0
+                                                        AND ISNULL(ProfitShares.VAT, 0) < 0 THEN
+                                                       ABS(ProfitShares.VAT)
+                                                   ELSE
+                                                       0
+                                               END
+                                            ) * CASE
+                                                    WHEN ISNULL(ProfitShares.ExtRateVND, 0) = 0 THEN
+                                                        ISNULL(ProfitShares.ExtVND, 0)
+                                                    ELSE
+                                                        ProfitShares.ExtRateVND
+                                                END AS numeric(26, 3)),
+                                       0
+                                   )
+                      END
+                  ) AS SumOfExtRate
+        FROM ProfitShares
+            RIGHT OUTER JOIN TransactionDetails AS TransDT
+                ON ProfitShares.HAWBNO = TransDT.HWBNO
+        WHERE ProfitShares.HAWBNO = [TransactionDetails].[HWBNO]
+              AND ProfitShares.Dpt = 0
+              AND ProfitShares.KBck <> 0
+              AND CHARINDEX('LINE', UPPER(ISNULL(SortDes, ''))) > 0
+    ),
+    0
+          ) AS SharedProfitLine,
+    IsNull(
+    (
+        SELECT Sum(   CASE
+                          WHEN ISNULL(SellingRate.CurrencyRate, 0) = 0 THEN
+                              0
+                          ELSE
+                              ROUND(
+                                       CAST(SellingRate.Quantity * SellingRate.UnitPrice
+                                            * CASE
+                                                  WHEN ISNULL(SellingRate.ExtRateVND, 0) = 0 THEN
+                                                      ISNULL(SellingRate.ExtVND, 0)
+                                                  ELSE
+                                                      SellingRate.ExtRateVND
+                                              END AS numeric(26, 3)),
+                                       0
+                                   )
+                      END
+                  ) AS SumOfCurrencyRate
+        FROM SellingRate
+            RIGHT OUTER JOIN TransactionDetails AS TransDT
+                ON SellingRate.HAWBNO = TransDT.HWBNO
+        WHERE SellingRate.HAWBNO = [TransactionDetails].[HWBNO]
+              AND CHARINDEX('TRUCK', SellingRate.Description) = 0
+              AND ISNULL(SellingRate.VAT, 0) <> 0
+              AND CHARINDEX('TRUCK', ISNULL(SellingRate.SortDes, '')) = 0
+    ),
+    0
+          ) AS DVSellingRateLC,
+    IsNull(
+    (
+        SELECT Sum(   CASE
+                          WHEN ISNULL(BuyingRateWithHBL.ExtRate, 0) = 0 THEN
+                              0
+                          ELSE
+                              ROUND(
+                                       CAST(BuyingRateWithHBL.Quantity * BuyingRateWithHBL.UnitPrice
+                                            * CASE
+                                                  WHEN ISNULL(BuyingRateWithHBL.ExtRateVND, 0) = 0 THEN
+                                                      ISNULL(BuyingRateWithHBL.ExtVND, 0)
+                                                  ELSE
+                                                      BuyingRateWithHBL.ExtRateVND
+                                              END AS numeric(26, 3)),
+                                       0
+                                   )
+                      END
+                  ) AS SumOfExtRate
+        FROM BuyingRateWithHBL
+            RIGHT OUTER JOIN TransactionDetails AS TransDT
+                ON BuyingRateWithHBL.HAWBNO = TransDT.HWBNO
+        WHERE BuyingRateWithHBL.HAWBNO = [TransactionDetails].[HWBNO]
+              AND ISNULL(BuyingRateWithHBL.VAT, 0) <> 0
+    ),
+    0
+          ) AS DVBuyingRateLC,
+    IsNull(
+    (
+        SELECT Sum(   CASE
+                          WHEN ISNULL(SellingRate.CurrencyRate, 0) = 0 THEN
+                              0
+                          ELSE
+                              ROUND(
+                                       CAST(SellingRate.Quantity * SellingRate.UnitPrice
+                                            * CASE
+                                                  WHEN ISNULL(SellingRate.ExtRateVND, 0) = 0 THEN
+                                                      ISNULL(SellingRate.ExtVND, 0)
+                                                  ELSE
+                                                      SellingRate.ExtRateVND
+                                              END AS numeric(26, 3)),
+                                       0
+                                   )
+                      END
+                  ) AS SumOfCurrencyRate
+        FROM SellingRate
+            INNER JOIN NameFeeDescription
+                ON SellingRate.SortDes = NameFeeDescription.FeeCode
+        WHERE SellingRate.HAWBNO = [TransactionDetails].[HWBNO]
+              AND ISNULL(NameFeeDescription.Logistics, 0) <> 0
+    ),
+    0
+          )
+    + IsNull(
+      (
+          SELECT Sum(   CASE
+                            WHEN ISNULL(ProfitShares.ExtRate, 0) = 0 THEN
+                                0
+                            ELSE
+                                ROUND(
+                                         CAST(ProfitShares.Quantity * ProfitShares.UnitPrice
+                                              * CASE
+                                                    WHEN ISNULL(ProfitShares.ExtRateVND, 0) = 0 THEN
+                                                        ISNULL(ProfitShares.ExtVND, 0)
+                                                    ELSE
+                                                        ProfitShares.ExtRateVND
+                                                END AS numeric(26, 3)),
+                                         0
+                                     )
+                        END
+                    ) AS SumOfCurrencyRate
+          FROM ProfitShares
+              INNER JOIN NameFeeDescription
+                  ON ProfitShares.SortDes = NameFeeDescription.FeeCode
+          WHERE ProfitShares.HAWBNO = [TransactionDetails].[HWBNO]
+                AND ProfitShares.ExtRate <> 0
+                AND ProfitShares.Dpt <> 0
+                AND ISNULL(NameFeeDescription.Logistics, 0) <> 0
+      ),
+      0
+            ) AS HLRev,
+    IsNull(
+    (
+        SELECT Sum(   CASE
+                          WHEN ISNULL(ProfitShares.ExtRate, 0) = 0 THEN
+                              0
+                          ELSE
+                              ROUND(
+                                       CAST((ProfitShares.Quantity * ProfitShares.UnitPrice
+                                             + CASE
+                                                   WHEN ISNULL(ProfitShares.NoInv, 0) <> 0
+                                                        AND ISNULL(ProfitShares.VAT, 0) >= 0 THEN
+                                                       ProfitShares.Quantity * ProfitShares.UnitPrice
+                                                       * ISNULL(ProfitShares.VAT, 0) / 100
+                                                   WHEN ISNULL(ProfitShares.NoInv, 0) <> 0
+                                                        AND ISNULL(ProfitShares.VAT, 0) < 0 THEN
+                                                       ABS(ProfitShares.VAT)
+                                                   ELSE
+                                                       0
+                                               END
+                                            ) * CASE
+                                                    WHEN ISNULL(ProfitShares.ExtRateVND, 0) = 0 THEN
+                                                        ISNULL(ProfitShares.ExtVND, 0)
+                                                    ELSE
+                                                        ProfitShares.ExtRateVND
+                                                END AS numeric(26, 3)),
+                                       0
+                                   )
+                      END
+                  ) AS SumOfCurrencyRate
+        FROM ProfitShares
+            INNER JOIN NameFeeDescription
+                ON ProfitShares.SortDes = NameFeeDescription.FeeCode
+        WHERE ProfitShares.HAWBNO = [TransactionDetails].[HWBNO]
+              AND ProfitShares.ExtRate <> 0
+              AND ProfitShares.Dpt = 0
+              AND ISNULL(NameFeeDescription.Logistics, 0) <> 0
+    ),
+    0
+          ) AS HLOtherCost,
+    Transactions.EstimatedVessel AS FeederVessel,
+    Transactions.RefNoSea AS FeederVoy,
+    Transactions.OceanVesselName AS MainVessel,
+    Transactions.OceanVoy AS MainVoy,
+    Transactions.TransitPortDes,
+    TransactionDetails.BookingID,
+    SeaBookingNote.WhoisMaking AS BKCreator,
+    SeaBookingNote.DropoffDate AS GateIn,
+    SeaBookingNote.CloseTimeLCL AS CloseTimeText,
+    SeaBookingNote.ClosingTimeDate AS ClosingTimeDate,
+    SeaBookingNote.VGMCutofftime,
+    SeaBookingNote.FreeDem,
+    SeaBookingNote.FreeDet,
+    '' AS TariffFreetimeatORI,
+    '' AS TariffFreetimeatDest,
+    CASE
+        WHEN ISNULL(TransactionDetails.BookingID, '') <> '' THEN
+        (
+            SELECT TOP 1
+                SBK.EmptyReturnDate
+            FROM SeaBookingNote AS SBK
+            WHERE SBK.BookingID = [TransactionDetails].[BookingID]
+        )
+        ELSE
+            CAST(NULL AS DATETIME)
+    END AS EmptyReturnDate,
+    Partners.PaymentTerm,
+    Partners.Anni_day,
+    Partners.Anni_Month,
+    Partners.Anni_Year,
+    CAST(0 AS FLOAT) AS B_Logistics,
+    CAST(0 AS FLOAT) AS PARTNERKB,
+    CAST(0 AS FLOAT) AS BUYINGCOLLECT,
+    CAST(0 AS FLOAT) AS B_CSSSEDISPS,
+    CAST(0 AS FLOAT) AS B_THC,
+    CAST(0 AS FLOAT) AS B_SEAL,
+    CAST(0 AS FLOAT) AS B_BLDO,
+    CAST(0 AS FLOAT) AS B_TELEX,
+    CAST(0 AS FLOAT) AS B_AMSACIISFAFRENSCAMSCIC,
+    CAST(0 AS FLOAT) AS B_HANDLINGPROFITSHARE,
+    CAST(0 AS FLOAT) AS B_CFSTCS,
+    CAST(0 AS FLOAT) AS SELLINGCOLLECT,
+    CAST(0 AS FLOAT) AS S_CSSSEDISPS,
+    CAST(0 AS FLOAT) AS S_THC,
+    CAST(0 AS FLOAT) AS S_SEAL,
+    CAST(0 AS FLOAT) AS S_BLDO,
+    CAST(0 AS FLOAT) AS S_TELEX,
+    CAST(0 AS FLOAT) AS S_AMSACIISFAFRENSCAMSCIC,
+    CAST(0 AS FLOAT) AS S_HANDLINGPROFITSHARE,
+    CAST(0 AS FLOAT) AS S_CFSTCS,
+    CAST(0 AS FLOAT) AS S_Logistics,
+    CAST(0 AS FLOAT) AS B_Truck
+FROM TransactionType
+    RIGHT OUTER JOIN Departments AS Departments_1
+        RIGHT OUTER JOIN ContactsList AS ContactsList_2
+            RIGHT OUTER JOIN Airports AS Airports_2
+                RIGHT OUTER JOIN Airports AS Airports_1
+                    RIGHT OUTER JOIN Transactions
+                        LEFT OUTER JOIN Partners AS Partners_1
+                            ON Transactions.ColoaderID = Partners_1.PartnerID
+                        LEFT OUTER JOIN Partners AS Partners_2
+                            ON Transactions.AgentID = Partners_2.PartnerID
+                        ON Airports_1.AirPortName = Transactions.PortofLading
+                    ON Airports_2.AirPortName = Transactions.PortofUnlading
+                ON ContactsList_2.Username = Transactions.WhoisMaking
+            ON Departments_1.DeptID = ContactsList_2.DeptID
+        LEFT OUTER JOIN HAWB
+            LEFT OUTER JOIN HAWBDETAILS
+                ON HAWB.HWBNO = HAWBDETAILS.HWBNO
+            RIGHT OUTER JOIN ContactsList AS ContactsList_4
+                RIGHT OUTER JOIN Departments AS Departments_2
+                    ON ContactsList_4.ContactID = Departments_2.ManagerContact
+                RIGHT OUTER JOIN ContactsList AS ContactsList_3
+                    RIGHT OUTER JOIN ContactsList AS ContactsList_1
+                        RIGHT OUTER JOIN CargoOperationRequest AS CargoOperationRequest_1
+                            RIGHT OUTER JOIN ContactsList
+                                RIGHT OUTER JOIN Partners
+                                    ON ContactsList.ContactID = Partners.ContactID
+                                RIGHT OUTER JOIN SeaBookingNote
+                                    RIGHT OUTER JOIN TransactionDetails
+                                        ON SeaBookingNote.BookingID = TransactionDetails.BookingID
+                                    ON Partners.PartnerID = TransactionDetails.ShipperID
+                                LEFT OUTER JOIN Departments
+                                    ON ContactsList.DeptID = Departments.DeptID
+                                ON CargoOperationRequest_1.HBLNo = TransactionDetails.HWBNO
+                            ON ContactsList_1.ContactID = Departments.ManagerContact
+                        ON ContactsList_3.ContactID = TransactionDetails.ContactID
+                    ON Departments_2.DeptID = ContactsList_3.DeptID
+                ON HAWB.HWBNO = TransactionDetails.HWBNO
+            ON Transactions.TransID = TransactionDetails.TransID
+        ON TransactionType.IDTransType = Transactions.TpyeofService
+    LEFT OUTER JOIN ContactsList AS ContactsList_5
+        ON Departments_1.ManagerContact = ContactsList_5.ContactID
+WHERE ISNULL(TransactionDetails.HWBNO, '') <> ''
+      AND TransactionType.Description In ( 'Export (Air)', 'Export (Consol)', 'Export (Sea FCL)', 'Export (Sea LCL)',
+                                           'Express', 'Import (Air)', 'Import (Consol)', 'Import (Sea FCL)',
+                                           'Import (Sea LCL)', 'Inland Trucking', 'Logistics', 'Projects'
+                                         )
+      AND Convert(   Char(8),
+                     CASE
+                         WHEN [Transactions].[Revision] IS NOT NULL THEN
+                             [Transactions].[Revision]
+                         WHEN Transactions.TpyeofService = 'InlandTrucking'
+                              AND TransactionDetails.AcDeliveryDate IS NOT NULL THEN
+                             TransactionDetails.AcDeliveryDate
+                         WHEN Transactions.TpyeofService = 'InlandTrucking'
+                              AND TransactionDetails.ETA IS NOT NULL THEN
+                             TransactionDetails.ETA
+                         WHEN Transactions.LoadingDate IS NOT NULL THEN
+                             Transactions.LoadingDate
+                         ELSE
+                             Transactions.TransDate
+                     END,
+                     112
+                 ) >= '20240401'
+      And Convert(   Char(8),
+                     CASE
+                         WHEN [Transactions].[Revision] IS NOT NULL THEN
+                             [Transactions].[Revision]
+                         WHEN Transactions.TpyeofService = 'InlandTrucking'
+                              AND TransactionDetails.AcDeliveryDate IS NOT NULL THEN
+                             TransactionDetails.AcDeliveryDate
+                         WHEN Transactions.TpyeofService = 'InlandTrucking'
+                              AND TransactionDetails.ETA IS NOT NULL THEN
+                             TransactionDetails.ETA
+                         WHEN Transactions.LoadingDate IS NOT NULL THEN
+                             Transactions.LoadingDate
+                         ELSE
+                             Transactions.TransDate
+                     END,
+                     112
+                 ) <= '20240430'
+      AND (Departments_1.CmpID IN ( '', 'UI/HCM' ))
+      AND ISNULL(Transactions.ErrorAttr, 0) = 0
+      AND ISNULL(TransactionDetails.ShipperID, '') <> ''
+ORDER BY RService,
+         TransID,
+         HWBNO,
+         SVORDER
